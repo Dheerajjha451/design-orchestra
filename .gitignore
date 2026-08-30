@@ -1,0 +1,8 @@
+node_modules
+dist
+*.tgz
+.design-orchestra-install.json
+design-orchestra.config.json
+.design-orchestra/
+NOTICE.md
+SOURCES.md

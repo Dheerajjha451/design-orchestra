@@ -1,0 +1,58 @@
+{
+  "name": "design-orchestra",
+  "version": "0.1.0",
+  "description": "A chat-native, multi-provider landing-page design workflow for React projects.",
+  "keywords": [
+    "design",
+    "landing-page",
+    "agents",
+    "skills",
+    "codex",
+    "claude-code",
+    "cursor",
+    "gemini",
+    "copilot"
+  ],
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "design-orchestra": "./dist/cli.js"
+  },
+  "exports": {
+    ".": "./dist/core.js"
+  },
+  "files": [
+    "dist/cli.js",
+    "dist/cli.d.ts",
+    "dist/core.js",
+    "dist/core.d.ts",
+    "dist/data/agents.js",
+    "dist/data/agents.d.ts",
+    "dist/data/archetypes.js",
+    "dist/data/archetypes.d.ts",
+    "dist/data/knowledge.js",
+    "dist/data/knowledge.d.ts",
+    "dist/types.js",
+    "dist/types.d.ts",
+    "templates",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "npm run build && node --test dist/test/*.test.js",
+    "validate": "npm run build && node dist/cli.js validate --package-root .",
+    "pack:check": "npm pack --dry-run",
+    "prepublishOnly": "npm test && npm run validate"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "typescript": "^5.7.3"
+  }
+}

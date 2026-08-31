@@ -42,6 +42,9 @@ export interface BriefV1 {
     colors: string[];
     source?: string;
   };
+  designFamilies?: string[];
+  sections?: string[];
+  navigationPreference?: string;
   emotionalResponse?: string;
   antiReferences?: string[];
   motionPreference?: "none" | "subtle" | "expressive";
@@ -79,6 +82,8 @@ export interface DirectionV1 {
     treatment: string;
   };
   composition: string;
+  navigation: string;
+  sections: string[];
   imagery: string;
   motion: string;
   conversionStructure: string[];

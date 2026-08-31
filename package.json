@@ -1,6 +1,6 @@
 {
   "name": "design-orchestra",
-  "version": "0.1.0",
+  "version": "0.1.2",
   "description": "A chat-native, multi-provider landing-page design workflow for React projects.",
   "keywords": [
     "design",

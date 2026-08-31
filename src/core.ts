@@ -96,12 +96,12 @@ const PALETTES = [
   ["#0B1020", "#F7F5EF", "#FF6B35", "#5EEAD4"],
   ["#101213", "#F6F0E8", "#C95D3A", "#D9A441"],
   ["#F4F3EE", "#161616", "#2855D9", "#D5FF3F"],
-  ["#120D1E", "#F5E9FF", "#FF3DAB", "#73F5FF"],
+  ["#172A3A", "#F2EFE8", "#D65A31", "#E8B931"],
   ["#14281D", "#FAF7F0", "#DBA159", "#D9E76C"],
   ["#F5F2EA", "#241E1B", "#B7183B", "#2C5BDB"],
 ];
 const TYPE_PAIRS = [
-  ["Space Grotesk", "Inter", "Compressed display with calm supporting text"],
+  ["Space Grotesk", "Public Sans", "Compressed display with calm supporting text"],
   ["DM Serif Display", "Manrope", "Editorial contrast with a practical reading voice"],
   ["IBM Plex Mono", "IBM Plex Sans", "Measured technical utility and clear scanning"],
   ["Archivo Black", "Archivo", "Poster-scale statements with robust body copy"],
@@ -116,11 +116,19 @@ const COMPOSITIONS = [
   "A typographic poster layout with a quiet utility bar, an oversized promise, and a focused conversion rail.",
   "A warm narrative rhythm: human need, tangible outcome, credible proof, practical next step."
 ];
+const NAVIGATION_PATTERNS = [
+  "Editorial masthead with chapter-like anchors and a quiet text action.",
+  "Centered mark with off-canvas navigation; no persistent CTA in the header.",
+  "Split navigation with the brand interrupting the grid, then a compact utility action.",
+  "Minimal utility bar that appears only after the hero; the first screen remains deliberately unframed.",
+  "Asymmetric vertical navigation rail on desktop that collapses to an accessible menu trigger on mobile.",
+  "No persistent navigation: use a clear in-page table of contents after the opening proposition."
+];
 const IMAGERY = [
   "Use a generated, art-directed hero image with a quiet negative-space area reserved for copy; record prompt, seed, and dimensions.",
   "Use verified, locally copied documentary photography that shows the audience's real context; avoid generic handshakes and fake dashboards.",
   "Use product UI captures only when they demonstrate the promised outcome; reserve dimensions and write descriptive alt text.",
-  "Use no raster hero image: create the visual signature with typography, CSS gradients, texture, and geometric composition.",
+  "Use no raster hero image: create the visual signature with typography, a deliberate color field, texture, and geometric composition.",
   "Use a small set of tightly art-directed still-life images with consistent crop, temperature, and subject distance."
 ];
 const MOTION = [
@@ -135,6 +143,8 @@ function makeDirection(seed: string, brief: BriefV1, index: number, primary: Des
   const palette = requestedPalette && requestedPalette.length >= 2 ? requestedPalette : pick(PALETTES, seed, index * 11 + 1);
   const type = pick(TYPE_PAIRS, seed, index * 11 + 2);
   const motionPreference = brief.motionPreference === "none" ? MOTION[0] : pick(MOTION, seed, index * 11 + 3);
+  const navigation = brief.navigationPreference ?? NAVIGATION_PATTERNS[(Math.floor(randomAt(seed, 99) * NAVIGATION_PATTERNS.length) + index) % NAVIGATION_PATTERNS.length]!;
+  const sections = brief.sections?.length ? brief.sections : ["Hero", "Evidence", "Outcome", "How it works", "Final CTA"];
   const title = `${primary.name} / ${companion.name}`;
   return {
     version: 1,
@@ -154,15 +164,11 @@ function makeDirection(seed: string, brief: BriefV1, index: number, primary: Des
     },
     typography: { display: type[0], body: type[1], scale: "clamp(2.75rem, 7vw, 6.5rem)", treatment: type[2] },
     composition: pick(COMPOSITIONS, seed, index * 11 + 4),
+    navigation,
+    sections,
     imagery: brief.mediaPreference === "no-images" ? IMAGERY[3] : pick(IMAGERY, seed, index * 11 + 5),
     motion: motionPreference,
-    conversionStructure: [
-      "Promise and primary CTA",
-      "Credible proof already supplied by the project",
-      "Outcome or product demonstration",
-      "How it works / objection handling",
-      "Final contextual CTA",
-    ],
+    conversionStructure: sections,
     rationale: `Chosen for ${brief.audience}: it combines ${primary.name.toLowerCase()} clarity with ${companion.name.toLowerCase()} character while keeping ${brief.cta} dominant.`,
     risks: [
       ...primary.antiPatterns.slice(0, 1),
@@ -213,20 +219,21 @@ export function renderMoodboardHtml(brief: BriefV1, directions: DirectionV1[]): 
       <div class="label">Direction 0${index + 1} · ${escapeHtml(direction.name)}</div>
       <section class="layout">
         <div class="device desktop">
-          <div class="nav">ORCHESTRA <span>Work &nbsp; Method &nbsp; About</span><button>Start here</button></div>
+          <div class="nav"><strong>ORCHESTRA</strong><span>${escapeHtml(direction.navigation)}</span></div>
           <div class="hero" style="--ink:${direction.tokens.palette[0]};--paper:${direction.tokens.palette[1]};--accent:${direction.tokens.palette[2]}">
             <p>For ${escapeHtml(brief.audience)}</p><h1>${escapeHtml(brief.offer)}</h1><div class="hero-row"><button>${escapeHtml(brief.cta)}</button><small>Evidence-led, not invented</small></div>
           </div>
           <div class="proof"><strong>Proof</strong><span>Use only project-supplied facts, assets, and customer evidence.</span></div>
         </div>
         <div class="device mobile">
-          <div class="mobile-bar">ORCHESTRA <button>Menu</button></div>
+          <div class="mobile-bar">ORCHESTRA <span>Menu pattern varies by direction</span></div>
           <div class="mobile-hero" style="--ink:${direction.tokens.palette[0]};--paper:${direction.tokens.palette[1]};--accent:${direction.tokens.palette[2]}"><p>For ${escapeHtml(brief.audience)}</p><h2>${escapeHtml(brief.offer)}</h2><button>${escapeHtml(brief.cta)}</button></div>
         </div>
       </section>
       <section class="details">
         <div><h3>Palette</h3><div class="palette">${palette}</div></div>
         <div><h3>Type</h3><p class="type"><em>${escapeHtml(direction.typography.display)}</em> + ${escapeHtml(direction.typography.body)}</p><p>${escapeHtml(direction.typography.treatment)}</p></div>
+        <div><h3>Navigation</h3><p>${escapeHtml(direction.navigation)}</p></div>
         <div><h3>Art direction</h3><p>${escapeHtml(direction.imagery)}</p></div>
         <div><h3>Motion</h3><p>${escapeHtml(direction.motion)}</p></div>
       </section>

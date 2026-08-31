@@ -18,6 +18,12 @@ Create a compact strategy artifact with:
 - a responsive section sequence; and
 - assumptions and unanswered questions.
 
+Build the section sequence around visitor questions, not a standard template:
+what this is, whether it is for them, why it is credible, how the outcome is
+achieved, and the next action. Remove duplicate sections. Use CTA and navigation
+labels that accurately describe the destination or outcome; vague labels weaken
+wayfinding.
+
 Do not invent testimonials, customer logos, customer counts, awards, security
 claims, or performance claims. If proof is weak, recommend honest substitutes:
 product demonstration, process transparency, founder expertise already supplied,

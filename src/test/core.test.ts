@@ -39,6 +39,17 @@ test("directions have material visual separation", () => {
       assert.ok(styleDistance(directions[index]!.fingerprint, directions[other]!.fingerprint) >= 12);
     }
   }
+  assert.equal(new Set(directions.map((direction) => direction.navigation)).size, 3);
+});
+
+test("user-selected sections and navigation are respected", () => {
+  const directions = createDirections({
+    ...brief,
+    sections: ["Hero", "Product demo", "Contact"],
+    navigationPreference: "Editorial masthead with a contact anchor.",
+  }, "brief-choices");
+  assert.deepEqual(directions[0]!.sections, ["Hero", "Product demo", "Contact"]);
+  assert.equal(directions[0]!.navigation, "Editorial masthead with a contact anchor.");
 });
 
 test("archetype catalog is complete and bounded", () => {
@@ -70,4 +81,5 @@ test("gallery is self-contained and preserves selection gate", () => {
   assert.match(html, /Direction 02/);
   assert.match(html, /Direction 03/);
   assert.match(html, /Select this direction in chat/);
+  assert.doesNotMatch(html, /AI\s*99%|live status|cinematic showcase|blur\(/i);
 });

@@ -26,6 +26,15 @@ test("CLI installs all provider profiles, protects edits, creates concepts, and 
     await invoke(["concepts", "--brief", "brief.json", "--seed", "cli-test"]);
     assert.match(await readFile(join(project, ".design-orchestra", "moodboards", "cli-test.html"), "utf8"), /Direction 03/);
 
+    // Test seed path traversal sanitization
+    await invoke(["concepts", "--brief", "brief.json", "--seed", "../../safe-seed"]);
+    assert.match(await readFile(join(project, ".design-orchestra", "moodboards", "______safe-seed.html"), "utf8"), /Direction 03/);
+
+    // Test option missing value throws an error
+    await assert.rejects(invoke(["concepts", "--brief"]), (error: { stderr?: string }) =>
+      Boolean(error.stderr && error.stderr.includes("requires a value"))
+    );
+
     await assert.rejects(invoke(["uninstall"]), (error: { code?: number }) => error.code === 2);
     assert.match(await readFile(join(project, ".codex", "agents", "creative-director.toml"), "utf8"), /user modification/);
   } finally {

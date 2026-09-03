@@ -51,11 +51,12 @@ function digest(input: string): number {
 }
 
 function randomAt(seed: string, position: number): number {
-  return digest(`${seed}:${position}`) / 0xffffffff;
+  return digest(`${seed}:${position}`) / 0x100000000;
 }
 
 function pick<T>(items: readonly T[], seed: string, position: number): T {
-  return items[Math.floor(randomAt(seed, position) * items.length)]!;
+  const index = Math.floor(randomAt(seed, position) * items.length);
+  return items[Math.min(index, items.length - 1)]!;
 }
 
 export function styleDistance(a: StyleFingerprint, b: StyleFingerprint): number {
@@ -197,7 +198,9 @@ export function createDirections(brief: BriefV1, seed = createRandomSeed()): Dir
     triples.push({ items, distance, relevance });
   }
   const eligible = triples.filter((triple) => triple.distance >= minDistance);
-  const best = (eligible.length ? eligible : triples).sort((a, b) => b.distance - a.distance || b.relevance - a.relevance)[0];
+  const best = (eligible.length
+    ? [...eligible].sort((a, b) => b.relevance - a.relevance || b.distance - a.distance)
+    : [...triples].sort((a, b) => b.distance - a.distance || b.relevance - a.relevance))[0];
   if (!best) throw new Error("Unable to select three design directions.");
   const chosen = best.items;
   return chosen.map((primary, index) => {
@@ -213,21 +216,24 @@ function escapeHtml(value: string): string {
 export function renderMoodboardHtml(brief: BriefV1, directions: DirectionV1[]): string {
   if (directions.length !== 3) throw new Error("A Design Orchestra concept round must contain exactly three directions.");
   const cards = directions.map((direction, index) => {
-    const palette = direction.tokens.palette.map((color) => `<span class="swatch" style="--swatch:${color}">${color}</span>`).join("");
+    const palette = direction.tokens.palette.map((color) => `<span class="swatch" style="--swatch:${escapeHtml(color)}">${escapeHtml(color)}</span>`).join("");
     const sections = direction.conversionStructure.map((item, itemIndex) => `<li><b>0${itemIndex + 1}</b> ${escapeHtml(item)}</li>`).join("");
+    const ink = direction.tokens.palette[0] ?? "#171719";
+    const paper = direction.tokens.palette[1] ?? "#ffffff";
+    const accent = direction.tokens.palette[2] ?? ink;
     return `<article class="direction ${index === 0 ? "active" : ""}" data-direction="${index}">
       <div class="label">Direction 0${index + 1} · ${escapeHtml(direction.name)}</div>
       <section class="layout">
         <div class="device desktop">
           <div class="nav"><strong>ORCHESTRA</strong><span>${escapeHtml(direction.navigation)}</span></div>
-          <div class="hero" style="--ink:${direction.tokens.palette[0]};--paper:${direction.tokens.palette[1]};--accent:${direction.tokens.palette[2]}">
+          <div class="hero" style="--ink:${ink};--paper:${paper};--accent:${accent}">
             <p>For ${escapeHtml(brief.audience)}</p><h1>${escapeHtml(brief.offer)}</h1><div class="hero-row"><button>${escapeHtml(brief.cta)}</button><small>Evidence-led, not invented</small></div>
           </div>
           <div class="proof"><strong>Proof</strong><span>Use only project-supplied facts, assets, and customer evidence.</span></div>
         </div>
         <div class="device mobile">
           <div class="mobile-bar">ORCHESTRA <span>Menu pattern varies by direction</span></div>
-          <div class="mobile-hero" style="--ink:${direction.tokens.palette[0]};--paper:${direction.tokens.palette[1]};--accent:${direction.tokens.palette[2]}"><p>For ${escapeHtml(brief.audience)}</p><h2>${escapeHtml(brief.offer)}</h2><button>${escapeHtml(brief.cta)}</button></div>
+          <div class="mobile-hero" style="--ink:${ink};--paper:${paper};--accent:${accent}"><p>For ${escapeHtml(brief.audience)}</p><h2>${escapeHtml(brief.offer)}</h2><button>${escapeHtml(brief.cta)}</button></div>
         </div>
       </section>
       <section class="details">
@@ -246,7 +252,7 @@ export function renderMoodboardHtml(brief: BriefV1, directions: DirectionV1[]): 
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Design Orchestra · Three directions</title>
   <style>
   :root{font-family:Inter,ui-sans-serif,system-ui,sans-serif;color:#171719;background:#efede7;line-height:1.5}*{box-sizing:border-box}body{margin:0;padding:clamp(20px,5vw,72px)}header{max-width:1260px;margin:auto;border-bottom:1px solid #c9c5bb;padding-bottom:28px}h1{font-size:clamp(2.4rem,6vw,5rem);line-height:.92;letter-spacing:-.06em;max-width:850px;margin:24px 0}.eyebrow,.label{text-transform:uppercase;letter-spacing:.12em;font-size:.72rem;font-weight:700}.intro{max-width:650px}.controls{display:flex;gap:10px;flex-wrap:wrap;margin-top:22px}.controls button,.select,button{font:inherit;cursor:pointer;border:1px solid currentColor;background:transparent;padding:9px 13px;border-radius:999px}.controls button[aria-pressed=true],.select{background:#171719;color:#fff}.direction{display:none;max-width:1260px;margin:44px auto}.direction.active{display:block}.layout{display:grid;grid-template-columns:minmax(0,3fr) minmax(220px,1fr);gap:26px;align-items:end}.device{background:#fff;box-shadow:0 12px 36px #2222;border:1px solid #c9c5bb;overflow:hidden}.nav,.mobile-bar{display:flex;justify-content:space-between;align-items:center;padding:16px 20px;font-size:.75rem;letter-spacing:.06em;font-weight:800}.nav span{font-weight:500;letter-spacing:0}.nav button,.mobile-bar button{padding:6px 10px}.hero{min-height:420px;padding:clamp(26px,6vw,86px);background:var(--paper);color:var(--ink);display:flex;flex-direction:column;justify-content:end;position:relative;isolation:isolate}.hero:before{content:"";position:absolute;width:45%;aspect-ratio:1;right:9%;top:13%;border-radius:50% 20% 50% 10%;background:var(--accent);opacity:.88;z-index:-1}.hero p,.mobile-hero p{font-weight:700;text-transform:uppercase;letter-spacing:.1em;font-size:.75rem}.hero h1{font-size:clamp(3.2rem,7vw,7rem);max-width:900px;margin:8px 0 26px}.hero-row{display:flex;gap:18px;align-items:center}.hero button,.mobile-hero button{background:var(--ink);color:var(--paper);border-color:var(--ink)}.proof{padding:22px;display:flex;gap:28px;border-top:1px solid #c9c5bb}.proof span{max-width:430px}.mobile{max-width:330px;margin-left:auto}.mobile-bar{font-size:.62rem}.mobile-hero{background:var(--paper);color:var(--ink);padding:70px 20px 24px;min-height:425px;display:flex;flex-direction:column;justify-content:end}.mobile-hero h2{font-size:2.8rem;line-height:.93;letter-spacing:-.06em;margin:5px 0 22px}.details{display:grid;grid-template-columns:repeat(4,1fr);gap:18px;margin:30px 0}.details>div,.sequence{border-top:1px solid #76726a;padding-top:10px}.details h3,.sequence h3{font-size:.75rem;text-transform:uppercase;letter-spacing:.1em;margin:0 0 10px}.details p{font-size:.88rem;margin:0}.type em{font-family:Georgia,serif;font-size:1.25rem}.palette{display:flex;gap:5px;flex-wrap:wrap}.swatch{background:var(--swatch);color:#fff;padding:5px 7px;font-size:.62rem;border-radius:3px;text-shadow:0 1px 2px #0008}.sequence ol{padding:0;list-style:none;display:grid;grid-template-columns:repeat(5,1fr);gap:10px}.sequence li{font-size:.82rem}.sequence b{color:#777}.rationale,.risk{max-width:800px}.risk{color:#7a281d}.select{margin-top:10px}.footer-note{max-width:1260px;margin:60px auto 0;font-size:.78rem;color:#5f5b54}@media(max-width:760px){body{padding:20px}.layout{grid-template-columns:1fr}.desktop{order:2}.mobile{order:1;margin:0;max-width:100%}.details{grid-template-columns:1fr 1fr}.sequence ol{grid-template-columns:1fr 1fr}.nav span{display:none}.proof{display:block}.proof span{display:block;margin-top:8px}}@media(max-width:420px){.details{grid-template-columns:1fr}.sequence ol{grid-template-columns:1fr}}@media(prefers-reduced-motion:no-preference){.direction.active{animation:enter .36s ease-out}@keyframes enter{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}}
-  </style></head><body><header><p class="eyebrow">Design Orchestra · concept round</p><h1>Three materially distinct ways to make the same promise.</h1><p class="intro">Brief: ${escapeHtml(brief.offer)}. Review one direction at a time, then make an explicit selection in your coding-agent conversation. No implementation should be edited before that selection.</p><div class="controls" role="tablist" aria-label="Moodboard directions">${directions.map((d, i) => `<button role="tab" aria-selected="${i === 0}" aria-pressed="${i === 0}" data-tab="${i}">0${i + 1} · ${escapeHtml(d.name)}</button>`).join("")}</div></header><main>${cards}</main><p class="footer-note">Seed: ${escapeHtml(directions[0].seed)} · Generated locally by Design Orchestra. The gallery is a decision artifact, not a substitute for user selection.</p><script>const tabs=[...document.querySelectorAll('[data-tab]')],dirs=[...document.querySelectorAll('.direction')];tabs.forEach(t=>t.addEventListener('click',()=>{const n=Number(t.dataset.tab);tabs.forEach((x,i)=>{x.setAttribute('aria-selected',String(i===n));x.setAttribute('aria-pressed',String(i===n))});dirs.forEach((x,i)=>x.classList.toggle('active',i===n))}));document.querySelectorAll('[data-select]').forEach(b=>b.addEventListener('click',()=>{const id=b.dataset.select;navigator.clipboard?.writeText(id);b.textContent='Selected: '+id+' — paste this into chat';}));</script></body></html>`;
+  </style></head><body><header><p class="eyebrow">Design Orchestra · concept round</p><h1>Three materially distinct ways to make the same promise.</h1><p class="intro">Brief: ${escapeHtml(brief.offer)}. Review one direction at a time, then make an explicit selection in your coding-agent conversation. No implementation should be edited before that selection.</p><div class="controls" role="tablist" aria-label="Moodboard directions">${directions.map((d, i) => `<button role="tab" aria-selected="${i === 0}" aria-pressed="${i === 0}" data-tab="${i}">0${i + 1} · ${escapeHtml(d.name)}</button>`).join("")}</div></header><main>${cards}</main><p class="footer-note">Seed: ${escapeHtml(directions[0].seed)} · Generated locally by Design Orchestra. The gallery is a decision artifact, not a substitute for user selection.</p><script>const tabs=[...document.querySelectorAll('[data-tab]')],dirs=[...document.querySelectorAll('.direction')];tabs.forEach(t=>t.addEventListener('click',()=>{const n=Number(t.dataset.tab);tabs.forEach((x,i)=>{x.setAttribute('aria-selected',String(i===n));x.setAttribute('aria-pressed',String(i===n))});dirs.forEach((x,i)=>x.classList.toggle('active',i===n))}));document.querySelectorAll('[data-select]').forEach(b=>b.addEventListener('click',async ()=>{const id=b.dataset.select;try{await navigator.clipboard?.writeText(id);}catch{}b.textContent='Selected: '+id+' — paste this into chat';}));</script></body></html>`;
 }
 
 export function relativeLuminance(hex: string): number {
@@ -268,6 +274,18 @@ export function validateBrief(value: unknown): ValidationResult {
   const brief = value as Partial<BriefV1>;
   const required = ["audience", "offer", "cta", "brand", "tone", "mediaPreference"] as const;
   for (const key of required) if (typeof brief[key] !== "string" || !brief[key].trim()) errors.push(`Brief.${key} is required.`);
+  const validMedia = ["generated", "search", "brand-assets", "no-images", "mixed"];
+  if (brief.mediaPreference && !validMedia.includes(brief.mediaPreference)) {
+    errors.push(`Brief.mediaPreference must be one of: ${validMedia.join(", ")}.`);
+  }
+  const validMotion = ["none", "subtle", "expressive"];
+  if (brief.motionPreference && !validMotion.includes(brief.motionPreference)) {
+    errors.push(`Brief.motionPreference must be one of: ${validMotion.join(", ")}.`);
+  }
+  const validAnimation = ["css", "framer-motion", "gsap", "3d", "none", "undecided"];
+  if (brief.animationTechnology && !validAnimation.includes(brief.animationTechnology)) {
+    errors.push(`Brief.animationTechnology must be one of: ${validAnimation.join(", ")}.`);
+  }
   if (!Array.isArray(brief.proof)) errors.push("Brief.proof must be an array; use an empty array when proof is unavailable.");
   if (brief.colorPalette && (!Array.isArray(brief.colorPalette.colors) || brief.colorPalette.colors.length < 2 || brief.colorPalette.colors.some((color) => !/^#[0-9a-f]{6}$/i.test(color)))) {
     errors.push("Brief.colorPalette must contain at least two six-digit hex colors.");
@@ -281,8 +299,15 @@ export function validateAssetLedger(value: unknown): ValidationResult {
   const errors: string[] = [];
   if (!value || typeof value !== "object" || !Array.isArray((value as AssetLedgerV1).assets)) return { valid: false, errors: ["Asset ledger requires an assets array."], warnings: [] };
   for (const [index, asset] of (value as AssetLedgerV1).assets.entries()) {
-    for (const key of ["localPath", "origin", "license", "alt"] as const) if (!asset[key]?.trim()) errors.push(`assets[${index}].${key} is required.`);
-    if (!asset.localPath.startsWith(".") && !asset.localPath.startsWith("assets/") && !asset.localPath.startsWith("public/")) errors.push(`assets[${index}].localPath must be a local project path.`);
+    if (!asset || typeof asset !== "object") {
+      errors.push(`assets[${index}] must be an object.`);
+      continue;
+    }
+    for (const key of ["localPath", "origin", "license", "alt"] as const) if (typeof asset[key] !== "string" || !asset[key].trim()) errors.push(`assets[${index}].${key} is required.`);
+    if (typeof asset.localPath === "string") {
+      const normalized = asset.localPath.replace(/\\/g, "/");
+      if (!normalized.startsWith(".") && !normalized.startsWith("assets/") && !normalized.startsWith("public/")) errors.push(`assets[${index}].localPath must be a local project path.`);
+    }
   }
   return { valid: errors.length === 0, errors, warnings: [] };
 }

@@ -7,6 +7,7 @@ import {
   styleDistance,
   validateAssetLedger,
   validateBrief,
+  compatible,
 } from "../core.js";
 import { ARCHETYPES } from "../data/archetypes.js";
 import type { BriefV1 } from "../types.js";
@@ -66,6 +67,47 @@ test("schemas reject missing proof and asset provenance", () => {
   assert.equal(validateBrief({ ...brief, proof: undefined }).valid, false);
   assert.equal(validateBrief({ ...brief, colorPalette: { colors: ["not-a-color"] } }).valid, false);
   assert.equal(validateAssetLedger({ version: 1, assets: [{ localPath: "assets/x.png", origin: "", license: "CC0", alt: "" }] }).valid, false);
+});
+
+test("validateAssetLedger handles missing localPath and non-object entries gracefully", () => {
+  const missingPathResult = validateAssetLedger({
+    version: 1,
+    assets: [{ origin: "generated", license: "CC0", alt: "Test" }],
+  });
+  assert.equal(missingPathResult.valid, false);
+  assert.ok(missingPathResult.errors.some((err) => err.includes("localPath is required")));
+
+  const nonObjectResult = validateAssetLedger({
+    version: 1,
+    assets: [null, "invalid"],
+  });
+  assert.equal(nonObjectResult.valid, false);
+  assert.ok(nonObjectResult.errors.some((err) => err.includes("must be an object")));
+});
+
+test("retro-y2k archetype compatibility matches correctly", () => {
+  const retroY2k = ARCHETYPES.find((a) => a.id === "retro-y2k");
+  const maximalist = ARCHETYPES.find((a) => a.id === "maximalist-collage");
+  const playful = ARCHETYPES.find((a) => a.id === "playful");
+  assert.ok(retroY2k && maximalist && playful);
+  assert.ok(compatible(retroY2k, maximalist));
+  assert.ok(compatible(retroY2k, playful));
+});
+
+test("validateBrief validates enum fields strictly", () => {
+  assert.equal(validateBrief({ ...brief, mediaPreference: "invalid-pref" as any }).valid, false);
+  assert.equal(validateBrief({ ...brief, motionPreference: "invalid-motion" as any }).valid, false);
+  assert.equal(validateBrief({ ...brief, animationTechnology: "invalid-tech" as any }).valid, false);
+});
+
+test("moodboard rendering safely handles 2-color palettes without undefined accents", () => {
+  const directions = createDirections({
+    ...brief,
+    colorPalette: { colors: ["#000000", "#FFFFFF"] },
+  }, "two-color-palette");
+  const html = renderMoodboardHtml(brief, directions);
+  assert.doesNotMatch(html, /--accent:undefined/);
+  assert.match(html, /--accent:#000000/);
 });
 
 test("a user palette is preserved over the fallback palette", () => {

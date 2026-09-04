@@ -2,7 +2,7 @@
 import { createHash } from "node:crypto";
 import { access, mkdir, readFile, readdir, rmdir, unlink, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
-import { basename, dirname, join, relative, resolve } from "node:path";
+import { basename, dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   DEFAULT_CONFIG,
@@ -16,7 +16,7 @@ import { AGENTS } from "./data/agents.js";
 import { ARCHETYPES } from "./data/archetypes.js";
 import { PROVIDERS, type ConfigV1, type InstallRecord, type Provider, type Scope } from "./types.js";
 
-const PACKAGE_VERSION = "0.1.0";
+const PACKAGE_VERSION = "0.1.2";
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const templateRoot = join(packageRoot, "templates");
 const ledgerName = ".design-orchestra-install.json";
@@ -50,10 +50,13 @@ function parseArgs(argv: string[]): { command: string; options: CliOptions } {
   const options: CliOptions = { scope: "project", dryRun: false, force: false, yes: false };
   for (let index = 0; index < rest.length; index += 1) {
     const arg = rest[index];
-    const value = () => rest[++index];
+    const value = () => {
+      const val = rest[++index];
+      if (val === undefined || val.startsWith("--")) throw new Error(`Option ${arg} requires a value.`);
+      return val;
+    };
     if (arg === "--provider") {
       const input = value();
-      if (!input) throw new Error("--provider requires a value.");
       const parsed = input.split(",").map((provider) => provider.trim()).filter(Boolean);
       const invalid = parsed.filter((provider) => !PROVIDERS.includes(provider as Provider));
       if (invalid.length) throw new Error("Unsupported provider: " + invalid.join(", "));
@@ -88,11 +91,14 @@ async function contentSha(content: string): Promise<string> {
   return createHash("sha256").update(content).digest("hex");
 }
 
-async function listFiles(root: string): Promise<string[]> {
+const EXCLUDED_DIRS = new Set(["node_modules", ".git", ".next", "dist", "build"]);
+
+async function listFiles(root: string, skipIgnored = false): Promise<string[]> {
   const entries = await readdir(root, { withFileTypes: true });
   const files = await Promise.all(entries.map(async (entry) => {
+    if (skipIgnored && EXCLUDED_DIRS.has(entry.name)) return [];
     const path = join(root, entry.name);
-    return entry.isDirectory() ? listFiles(path) : [path];
+    return entry.isDirectory() ? listFiles(path, skipIgnored) : [path];
   }));
   return files.flat();
 }
@@ -156,9 +162,7 @@ function agentContent(provider: Provider, agent: (typeof AGENTS)[number]): strin
       "sandbox_mode = \"" + agent.sandbox + "\"\n" +
       "developer_instructions = \"\"\"\n" + quote + "\n\"\"\"\n";
   }
-  const frontmatter = provider === "copilot"
-    ? "---\nname: " + agent.name + "\ndescription: " + agent.description + "\n---"
-    : "---\nname: " + agent.name + "\ndescription: " + agent.description + "\n---";
+  const frontmatter = "---\nname: " + agent.name + "\ndescription: " + agent.description + "\n---";
   return frontmatter + "\n\n# " + agent.name + "\n\n" + agent.instructions + "\n";
 }
 
@@ -278,9 +282,10 @@ async function validate(root: string, target?: string): Promise<number> {
     if (markdown.length !== 6) errors.push("Expected exactly six SKILL.md files.");
     for (const file of markdown) {
       const content = await readFile(file, "utf8");
+      const normalized = content.replace(/\r\n/g, "\n");
       const expected = basename(dirname(file));
-      if (!content.startsWith("---\nname: " + expected + "\n")) errors.push("Invalid skill frontmatter: " + relative(root, file));
-      if (!/description: .+/.test(content)) errors.push("Missing skill description: " + relative(root, file));
+      if (!normalized.startsWith("---\nname: " + expected + "\n")) errors.push("Invalid skill frontmatter: " + relative(root, file));
+      if (!/description: .+/.test(normalized)) errors.push("Missing skill description: " + relative(root, file));
     }
   }
   if (AGENTS.length !== 5) errors.push("Expected five provider-neutral agents.");
@@ -299,7 +304,7 @@ async function validate(root: string, target?: string): Promise<number> {
   if (!ledgerResult.valid) errors.push(...ledgerResult.errors);
   if (target) {
     const targetRoot = resolve(target);
-    const targetFiles = await listFiles(targetRoot);
+    const targetFiles = await listFiles(targetRoot, true);
     for (const file of targetFiles.filter((file) => /\.(?:[cm]?[jt]sx?|html)$/i.test(file))) {
       const source = await readFile(file, "utf8");
       if (/<svg[\s>]/i.test(source)) errors.push("Handwritten inline SVG is prohibited: " + file);
@@ -320,8 +325,13 @@ async function uninstall(cwd: string, options: CliOptions): Promise<number> {
   const record = await readRecord(root);
   if (!record) { console.log("No Design Orchestra install record found."); return 0; }
   const remaining: Record<string, string> = {};
+  const rootPrefix = root.endsWith(sep) ? root : root + sep;
   for (const [file, expected] of Object.entries(record.files)) {
-    const path = join(root, file);
+    const path = resolve(root, file);
+    if (!path.startsWith(rootPrefix)) {
+      console.warn("Skipping untrusted record path: " + file);
+      continue;
+    }
     if (!(await exists(path))) continue;
     if ((await sha(path)) !== expected) {
       console.warn("Preserved modified file: " + file);
@@ -331,7 +341,7 @@ async function uninstall(cwd: string, options: CliOptions): Promise<number> {
     if (!options.dryRun) await unlink(path);
     if (!options.dryRun) {
       let current = dirname(path);
-      while (current.startsWith(root) && current !== root) {
+      while (current.startsWith(rootPrefix) && current !== root) {
         try { await rmdir(current); current = dirname(current); } catch { break; }
       }
     }
@@ -349,9 +359,10 @@ async function concepts(cwd: string, options: CliOptions): Promise<number> {
   const brief = JSON.parse(await readFile(resolve(cwd, options.briefPath), "utf8"));
   const result = validateBrief(brief);
   if (!result.valid) throw new Error(result.errors.join(" "));
-  const seed = options.seed ?? createRandomSeed();
-  const directions = createDirections(brief, seed);
-  const out = resolve(cwd, options.out ?? join(".design-orchestra", "moodboards", seed + ".html"));
+  const rawSeed = options.seed ?? createRandomSeed();
+  const safeSeed = rawSeed.replace(/[^a-zA-Z0-9_-]/g, "_");
+  const directions = createDirections(brief, rawSeed);
+  const out = resolve(cwd, options.out ?? join(".design-orchestra", "moodboards", safeSeed + ".html"));
   if (!options.dryRun) { await mkdir(dirname(out), { recursive: true }); await writeFile(out, renderMoodboardHtml(brief, directions), "utf8"); }
   console.log((options.dryRun ? "would write " : "wrote ") + out);
   console.log("Directions: " + directions.map((direction) => direction.id + " (" + direction.name + ")").join(", "));
